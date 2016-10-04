@@ -2,27 +2,34 @@ class PointMapException(Exception):
     pass
 
 
-class PointMap(object):
-    MINIMUM_LOCAL = 0
-    MINIMUM_GLOBAL = 1
-    MINIMUM_OTHER = 2
+class Point(object):
+    def __init__(self, x, y, value, stratum=None, is_border=False):
+        self.x = x
+        self.y = y
+        self.value = value
+        self.stratum = stratum
+        self.is_border = is_border
 
-    def __init__(self, points):
-        self._points = PointMap.validate_points(points)
-        self._n_rows = len(self._points)
-        self._n_cols = len(self._points[0])
-        self._minima = []
-        self._strata = []
-        self._strata_groups = []
+    def __eq__(self, other):
+        return (self.x == other.x and self.y == other.y and
+                self.value == other.value and self.stratum == other.stratum)
 
     def __str__(self):
-        points = '\n'.join(
-            ['|'.join(['{:2}'.format(element) for element in row])
+        return '{0:2} ({1:2}){2}'.format(
+            self.value, self.stratum, '*' if self.is_border else ' ')
+
+
+class PointMap(object):
+    def __init__(self, points):
+        self._points = PointMap._parse_points(points)
+        self._n_rows = len(self._points)
+        self._n_cols = len(self._points[0])
+        self._strata = []
+
+    def __str__(self):
+        return '\n'.join(
+            ['|'.join([str(element) for element in row])
              for row in self._points])
-        strata = '\n'.join(
-            ['|'.join(['{:2}'.format(element) for element in row])
-             for row in self._strata])
-        return points + '\n---\n' + strata
 
     def __repr__(self):
         return str(self)
@@ -31,7 +38,17 @@ class PointMap(object):
         return self._points[index[0]][index[1]]
 
     @staticmethod
-    def validate_points(points):
+    def _parse_points(points):
+        points_parsed = []
+        for x, row in enumerate(PointMap._validate_points(points)):
+            row_aux = []
+            for y, value in enumerate(row):
+                row_aux.append(Point(x, y, value))
+            points_parsed.append(row_aux)
+        return points_parsed
+
+    @staticmethod
+    def _validate_points(points):
         if type(points) is not list:
             raise PointMapException("'points' must be a list of lists")
         if not len(points):
@@ -47,64 +64,46 @@ class PointMap(object):
                     "'points' must represent a valid matrix")
         return points
 
-    def compute_minima(self):
-        self._minima = []
-        for i, row in enumerate(self._points):
-            self._minima.append([])
-            for j, point in enumerate(row):
-                self._minima[i].append(self._classify_minimum(i, j))
+    def compute_borders(self):
+        self._compute_strata()
+        for group in self._strata:
+            is_border = False
+            if all(self._is_minimum(point) for point in group):
+                is_border = True
+            for point in group:
+                point.is_border = is_border
 
-    def _classify_minimum(self, i, j):
-        if all(self[i, j] < value for value in self._get_neighbor_values(i, j)):
-            return PointMap.MINIMUM_GLOBAL
-        if any(self[i, j] > value for value in self._get_neighbor_values(i, j)):
-            return PointMap.MINIMUM_OTHER
-        return PointMap.MINIMUM_LOCAL
+    def _compute_strata(self):
+        for row in self._points:
+            for point in row:
+                if point.stratum is None:
+                    self._init_stratum(point)
+                    self._transmit_stratum(point)
 
-    def _get_neighbor_values(self, i, j):
-        neighbor_up_value = self._get_neighbor_value(i, j, -1, 0)
-        neighbor_right_value = self._get_neighbor_value(i, j, 0, 1)
-        neighbor_down_value = self._get_neighbor_value(i, j, 1, 0)
-        neighbor_left_value = self._get_neighbor_value(i, j, 0, -1)
-        return [neighbor_value for neighbor_value in [
-            neighbor_up_value, neighbor_right_value,
-            neighbor_down_value, neighbor_left_value]
-            if neighbor_value is not None]
+    def _init_stratum(self, point):
+        point.stratum = len(self._strata)
+        self._strata.append([point])
 
-    def _get_neighbor_value(self, i, j, i_rel, j_rel):
-        if self._is_valid_point(i, j, i_rel, j_rel):
-            return self[i + i_rel, j + j_rel]
-        return None
+    def _transmit_stratum(self, point):
+        for neighbor in self._get_neighbors(point):
+            if point.value == neighbor.value and neighbor.stratum is None:
+                neighbor.stratum = point.stratum
+                self._strata[point.stratum].append(neighbor)
+                self._transmit_stratum(neighbor)
+
+    def _is_minimum(self, point):
+        return all(
+            point.value <= neighbor.value
+            for neighbor in self._get_neighbors(point))
+
+    def _get_neighbors(self, point):
+        neighbors = []
+        for neighbor_i, neighbor_j in ((0, -1), (-1, 0), (0, 1), (1, 0)):
+            if self._is_valid_point(point.x, point.y, neighbor_i, neighbor_j):
+                neighbors.append(
+                    self[point.x + neighbor_i, point.y + neighbor_j])
+        return neighbors
 
     def _is_valid_point(self, i, j, i_rel, j_rel):
         return (0 <= i + i_rel <= self._n_rows - 1
                 and 0 <= j + j_rel <= self._n_cols - 1)
-
-    def compute_strata(self):
-        self._strata = [
-            [None for _ in range(self._n_cols)] for _ in range(self._n_rows)]
-        for i, row in enumerate(self._points):
-            for j, point in enumerate(row):
-                self._classify_stratum(i, j)
-
-    def _classify_stratum(self, i, j):
-        if self._strata[i][j] is None:
-            self._create_stratum(i, j)
-            self._transmit_stratum(i, j)
-
-    def _create_stratum(self, i, j):
-        self._strata[i][j] = len(self._strata_groups)
-        self._strata_groups.append([(i, j)])
-
-    def _transmit_stratum(self, i, j):
-        for neighbor_i, neighbor_j in ((0, -1), (-1, 0), (0, 1), (1, 0)):
-            if self._is_valid_point(i, j, neighbor_i, neighbor_j):
-                if (self[i, j] == self._get_neighbor_value(
-                        i, j, neighbor_i, neighbor_j) and
-                        self._strata[i + neighbor_i][j + neighbor_j] is None):
-                    self._strata[i + neighbor_i][j + neighbor_j] = \
-                        self._strata[i][j]
-                    self._strata_groups[self._strata[i][j]].append(
-                        (i + neighbor_i, j + neighbor_j))
-                    self._transmit_stratum(i + neighbor_i, j + neighbor_j)
-

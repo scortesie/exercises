@@ -1,12 +1,12 @@
 import unittest
 
-from pointmap import PointMap, PointMapException
+from pointmap import Point, PointMap, PointMapException
 
 
 class TestPointMap(unittest.TestCase):
     def test_validate_points_should_raise_when_invalid_matrix(self):
         with self.assertRaises(PointMapException) as e:
-            PointMap.validate_points([
+            PointMap._validate_points([
                 [1, 2, 3],
                 [4, 5]])
         self.assertEqual(
@@ -17,7 +17,7 @@ class TestPointMap(unittest.TestCase):
         points = [
             [1, 2, 3],
             [4, 5, 6]]
-        self.assertEqual(points, PointMap.validate_points(points))
+        self.assertEqual(points, PointMap._validate_points(points))
 
     def test_getitem_should_return_points(self):
         pmap = PointMap([
@@ -33,6 +33,59 @@ class TestPointMap(unittest.TestCase):
         self.assertEqual(7, pmap[2, 0])
         self.assertEqual(9, pmap[2, 1])
         self.assertEqual(0, pmap[2, 2])
+
+    def test_parse_points_should_codify_values_using_points(self):
+        points = PointMap._parse_points([
+            [5, 4, 3],
+            [1, 2, 6],
+            [7, 9, 0],
+        ])
+        self.assertEqual(3, len(points))
+        self.assertEqual(3, len(points[0]))
+        self.assertEqual(3, len(points[1]))
+        self.assertEqual(3, len(points[2]))
+        self.assertEqual(Point(0, 0, 5, None), points[0][0])
+        self.assertEqual(Point(0, 1, 4, None), points[0][1])
+        self.assertEqual(Point(0, 2, 3, None), points[0][2])
+        self.assertEqual(Point(1, 0, 1, None), points[1][0])
+        self.assertEqual(Point(1, 1, 2, None), points[1][1])
+        self.assertEqual(Point(1, 2, 6, None), points[1][2])
+        self.assertEqual(Point(2, 0, 7, None), points[2][0])
+        self.assertEqual(Point(2, 1, 9, None), points[2][1])
+        self.assertEqual(Point(2, 2, 0, None), points[2][2])
+
+    def test_get_neighbors(self):
+        pmap = PointMap([
+            [5, 4, 3],
+            [1, 2, 6],
+            [7, 9, 0]])
+        self.assertEqual(
+            [Point(0, 1, 4), Point(1, 0, 1)],
+            pmap._get_neighbors(pmap[0, 0]))
+        self.assertEqual(
+            [Point(0, 0, 5), Point(0, 2, 3), Point(1, 1, 2)],
+            pmap._get_neighbors(pmap[0, 1]))
+        self.assertEqual(
+            [Point(0, 1, 4), Point(1, 2, 6)],
+            pmap._get_neighbors(pmap[0, 2]))
+        self.assertEqual(
+            [Point(0, 0, 5), Point(1, 1, 2), Point(2, 0, 7)],
+            pmap._get_neighbors(pmap[1, 0]))
+        self.assertEqual(
+            [Point(1, 0, 1), Point(0, 1, 4), Point(1, 2, 6), Point(2, 1, 9)],
+            pmap._get_neighbors(pmap[1, 1]))
+        self.assertEqual(
+            [Point(1, 1, 2), Point(0, 2, 3), Point(2, 2, 0)],
+            pmap._get_neighbors(pmap[1, 2]))
+        self.assertEqual(
+            [Point(1, 0, 1), Point(2, 1, 9)],
+            pmap._get_neighbors(pmap[2, 0]))
+        self.assertEqual(
+            [Point(2, 0, 7), Point(1, 1, 2), Point(2, 2, 0)],
+            pmap._get_neighbors(pmap[2, 1]))
+        self.assertEqual(
+            [Point(2, 1, 9), Point(1, 2, 6)],
+            pmap._get_neighbors(pmap[2, 2]))
 
     def test_get_neighbor_value_should_return_none_if_out_of_range_from_up_left(self):
         pmap = PointMap([
@@ -199,13 +252,13 @@ class TestPointMap(unittest.TestCase):
             [PointMap.MINIMUM_OTHER, PointMap.MINIMUM_OTHER, PointMap.MINIMUM_GLOBAL],
             ], pmap._minima)
 
-    def test_create_stratum_should_set_stratum(self):
+    def test_init_stratum_should_set_stratum(self):
         pmap = PointMap([
             [3, 5, 6],
             [1, 2, 6],
             [7, 9, 0]])
         pmap._strata = [[None for _ in range(3)] for _ in range(3)]
-        pmap._create_stratum(0, 0)
+        pmap._init_stratum(0, 0)
         self.assertEqual(0, pmap._strata[0][0])
         self.assertEqual([(0, 0)], pmap._strata_groups[0])
 
