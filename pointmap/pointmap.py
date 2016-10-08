@@ -12,7 +12,8 @@ class Point(object):
 
     def __eq__(self, other):
         return (self.x == other.x and self.y == other.y and
-                self.value == other.value and self.stratum == other.stratum)
+                self.value == other.value and self.stratum == other.stratum and
+                self.is_border == other.is_border)
 
     def __str__(self):
         return '{0:2} ({1:2}){2}'.format(
@@ -25,17 +26,6 @@ class PointMap(object):
         self._n_rows = len(self._points)
         self._n_cols = len(self._points[0])
         self._strata = []
-
-    def __str__(self):
-        return '\n'.join(
-            ['|'.join([str(element) for element in row])
-             for row in self._points])
-
-    def __repr__(self):
-        return str(self)
-
-    def __getitem__(self, index):
-        return self._points[index[0]][index[1]]
 
     @staticmethod
     def _parse_points(points):
@@ -61,7 +51,7 @@ class PointMap(object):
                 raise PointMapException("'points' must be a list of lists")
             if len(row) != dimension:
                 raise PointMapException(
-                    "'points' must represent a valid matrix")
+                    "'points' lists must have same length")
         return points
 
     def compute_borders(self):
@@ -107,3 +97,14 @@ class PointMap(object):
     def _is_valid_point(self, i, j, i_rel, j_rel):
         return (0 <= i + i_rel <= self._n_rows - 1
                 and 0 <= j + j_rel <= self._n_cols - 1)
+
+    def __str__(self):
+        return '\n'.join(
+            ['|'.join([str(element) for element in row])
+             for row in self._points])
+
+    def __repr__(self):
+        return str(self)
+
+    def __getitem__(self, index):
+        return self._points[index[0]][index[1]]
